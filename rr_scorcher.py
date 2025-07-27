@@ -3,22 +3,23 @@ import sys
 import logging
 from dataclasses import dataclass
 from pathlib import Path, PureWindowsPath
-from typing import Iterable
+from typing import Iterable, Optional
 from struct import unpack
 
 _TAGDEN = "TAGDEN.BIN"
-_ABSOLUTE_DEV_COMPUTER_PREFIX: str = "l:\\scorpc\\game\\"
+_ABSOLUTE_DEV_COMPUTER_PREFIX: PureWindowsPath = PureWindowsPath("l:\\scorpc\\game\\")
 
 logger = logging.getLogger()
 
 
-@dataclass(frozen=True)
+@dataclass
 class TagdenFile:
-    path: str
+    internal_path: PureWindowsPath
     type: int
     offset: int
     size: int
     unknown1: int
+    output_path: Optional[Path] = None
 
 
 def _read_file(path: Path) -> bytes:
@@ -34,24 +35,26 @@ def _identify_tagden_files(buf: io.BytesIO) -> Iterable[TagdenFile]:
         if type != 16:
             break
         path_raw: bytes = buf.read(frame_size - (buf.tell() - frame_start))
-        path = path_raw[: path_raw.find(b"\x00")].decode()
-        logger.debug("Found file '%s'", path)
-        yield TagdenFile(path, type, offset, size, unknown1)
+        internal_tagden_path = PureWindowsPath(
+            path_raw[: path_raw.find(b"\x00")].decode()
+        )
+        logger.debug("Found file '%s'", internal_tagden_path)
+        yield TagdenFile(internal_tagden_path, type, offset, size, unknown1)
 
 
-def _remove_absolute_tagden_path(internal_tagden_path: str) -> Path:
+def _remove_absolute_tagden_path(internal_tagden_path: PureWindowsPath) -> Path:
     """
     Files are stored with absolute file names from a developer computer.
     Convert these to something that can be stored in the output directory.
     """
-    return Path(internal_tagden_path[len(_ABSOLUTE_DEV_COMPUTER_PREFIX) :])
+    return Path(*internal_tagden_path.parts[len(_ABSOLUTE_DEV_COMPUTER_PREFIX.parts) :])
 
 
 def _extract_tagden_file(
     tagden_buf: io.BytesIO, tagden_file: TagdenFile, dest_dir: Path
 ) -> None:
-    win_path = PureWindowsPath(_remove_absolute_tagden_path(tagden_file.path))
-    put_path = Path(dest_dir, *win_path.parts)
+    win_path = _remove_absolute_tagden_path(tagden_file.internal_path)
+    put_path = dest_dir / win_path
     put_dir = Path(*put_path.parts[:-1])
     if not put_dir.exists():
         put_dir.mkdir(parents=True)
