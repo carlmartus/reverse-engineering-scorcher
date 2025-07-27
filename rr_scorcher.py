@@ -1,10 +1,65 @@
+import io
 import sys
 import logging
-from pathlib import Path
+from dataclasses import dataclass
+from pathlib import Path, PureWindowsPath
+from typing import Iterable
+from struct import unpack
 
 _TAGDEN = "TAGDEN.BIN"
+_ABSOLUTE_DEV_COMPUTER_PREFIX: str = "l:\\scorpc\\game\\"
 
 logger = logging.getLogger()
+
+
+@dataclass(frozen=True)
+class TagdenFile:
+    path: str
+    type: int
+    offset: int
+    size: int
+    unknown1: int
+
+
+def _read_file(path: Path) -> bytes:
+    with open(path, "rb") as fd:
+        return fd.read()
+
+
+def _identify_tagden_files(buf: io.BytesIO) -> Iterable[TagdenFile]:
+    while True:
+        frame_start = buf.tell()
+        buf.read(2)
+        type, offset, size, unknown1, frame_size = unpack(">HIIHH", buf.read(14))
+        if type != 16:
+            break
+        path_raw: bytes = buf.read(frame_size - (buf.tell() - frame_start))
+        path = path_raw[: path_raw.find(b"\x00")].decode()
+        logger.debug("Found file '%s'", path)
+        yield TagdenFile(path, type, offset, size, unknown1)
+
+
+def _remove_absolute_tagden_path(internal_tagden_path: str) -> Path:
+    """
+    Files are stored with absolute file names from a developer computer.
+    Convert these to something that can be stored in the output directory.
+    """
+    return Path(internal_tagden_path[len(_ABSOLUTE_DEV_COMPUTER_PREFIX) :])
+
+
+def _extract_tagden_file(
+    tagden_buf: io.BytesIO, tagden_file: TagdenFile, dest_dir: Path
+) -> None:
+    win_path = PureWindowsPath(_remove_absolute_tagden_path(tagden_file.path))
+    put_path = Path(dest_dir, *win_path.parts)
+    put_dir = Path(*put_path.parts[:-1])
+    if not put_dir.exists():
+        put_dir.mkdir(parents=True)
+        logger.debug("Creating directory '%s' for extraction", put_dir)
+    tagden_buf.seek(tagden_file.offset)
+    with open(put_path, "wb") as fd:
+        fd.write(tagden_buf.read(tagden_file.size))
+    logger.debug("Extracted file '%s'", put_path)
 
 
 def extract_all(tagden_path: Path, dest_dir: Path) -> None:
@@ -14,6 +69,17 @@ def extract_all(tagden_path: Path, dest_dir: Path) -> None:
     if not dest_dir.exists():
         logger.info("Creating output directory '%s'", dest_dir)
         dest_dir.mkdir()
+
+    tagden_buf: bytes = _read_file(tagden_path)
+    tagden_files: list[TagdenFile] = list(
+        _identify_tagden_files(io.BytesIO(tagden_buf))
+    )
+    logger.info("Found %d files in '%s', extracting...", len(tagden_files), tagden_path)
+
+    read_buf = io.BytesIO(tagden_buf)
+    for tagden_file in tagden_files:
+        _extract_tagden_file(read_buf, tagden_file, dest_dir)
+    logger.info("All files extraced")
 
 
 if __name__ == "__main__":
