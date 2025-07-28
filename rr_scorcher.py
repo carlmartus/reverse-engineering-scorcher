@@ -83,8 +83,7 @@ def _r0v_extract_bits(num: int) -> list[int]:
 
     def ext(r):
         col = (num >> r.start) & ((1 << (r.stop - r.start)) - 1)
-        col = (col << 3) | 0b111
-        return col
+        return col * 8
 
     return [ext(r) for r in rs]
 
