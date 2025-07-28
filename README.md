@@ -28,9 +28,9 @@ All formats seams to be build as in house formats.
 
 | Ext. | Count | Description | Status |
 |---:|---:|:---|:---|
-| `.bin` | `1` | Assets content archive | 🟢 Decoded |
+| `.bin` | `1` | Assets content archive | 🟢 Decodes to files |
 | `.bin` | `184` | ??? | 🔴 Not decoded |
-| `.r0v` | `91` | Image 15-bit | 🟢 Decoded |
+| `.r0v` | `91` | Image 15-bit | 🟢 Decodes to `.png` |
 | `.wl3` | `64` | 3D model |  🔴 Not decoded |
 | `.0` | `51` | ??? | 🔴 Not decoded |
 | `.ld` | `31` | ??? | 🔴 Not decoded |
