@@ -209,7 +209,7 @@ if __name__ == "__main__":
     logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.INFO)
     if len(sys.argv) != 2:
         logger.error(
-            "Please specify path to '%s' as argument",
+            "Please specify path to '%s' as argument, see Readme file about how to obtain",
             _TAGDEN,
         )
         sys.exit(1)
